@@ -1,4 +1,4 @@
-	local GLOBAL_DATA_MODULE = 'global_data'
+local GLOBAL_DATA_MODULE = 'global_data'
 local GLOBAL = false
 local LOCAL = true
 
@@ -31,11 +31,17 @@ local function EventHelpers(domoticz, mainMethod)
 	local settings = {
 		['Log level'] = tonumber(globalvariables['dzVents_log_level']) or  1,
 		['Domoticz url'] = _url,
-		['url'] = url,
-		['webRoot'] = tostring(webRoot),
-		['serverPort'] = globalvariables['domoticz_listening_port'] or '8080'
+		url = url,
+		webRoot = tostring(webRoot),
+		serverPort = globalvariables['domoticz_listening_port'] or '8080',
+		dzVentsVersion = globalvariables.dzVents_version,
+		domoticzVersion = globalvariables.domoticz_version,
+		location = {
+			name = utils.urlDecode(globalvariables['domoticz_title'] or "Domoticz"),
+			latitude = globalvariables.latitude or 0,
+			longitude = globalvariables.longitude or 0,
+		}
 	}
-
 
 	if (webRoot ~= '' and webRoot ~= nil) then
 		settings['Domoticz url'] = settings['Domoticz url'] .. '/' .. tostring(webRoot)
@@ -271,7 +277,7 @@ local function EventHelpers(domoticz, mainMethod)
 
 				return res
 			else
-				utils.log('An error occured when calling event handler ' .. eventHandler.name, utils.LOG_ERROR)
+				utils.log('An error occurred when calling event handler ' .. eventHandler.name, utils.LOG_ERROR)
 				utils.log(res, utils.LOG_ERROR) -- error info
 			end
 		else
@@ -764,13 +770,12 @@ local function EventHelpers(domoticz, mainMethod)
 		-- id is done later
 
 		for scriptTrigger, scripts in pairs(allEventScripts) do
-			if (string.find(scriptTrigger, '*')) then -- a wild-card was use
-				-- turn it into a valid regexp
-				scriptTrigger = '^' .. string.gsub(scriptTrigger, "*", ".*") .. '$'
+
+			if (string.find(scriptTrigger, '*')) then -- a wild-card was used
+				-- substitute 'magical chars' with a dot (a dot matches every char) and then turn it into a valid regexp and 
+				scriptTrigger = ('^' .. scriptTrigger:gsub("[%^$]","."):gsub("*", ".*") .. '$'):gsub('[^%w%s~{\\}:&(/)<>,?@#|_^*$]','.')
 
 				if (string.match(target, scriptTrigger)) then
-					-- there is trigger for this target
-
 					if modules == nil then modules = {} end
 
 					for i, mod in pairs(scripts) do

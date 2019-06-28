@@ -169,6 +169,9 @@ bool CRtl433::ParseLine(const std::vector<std::string> &headers, const char *lin
 	bool haveWind_Dir = false;
 	int wind_dir = 0;
 
+	bool haveMoisture = false;
+	int moisture = 0;
+
 	if (!data["id"].empty())
 	{
 		id = atoi(data["id"].c_str());
@@ -204,6 +207,11 @@ bool CRtl433::ParseLine(const std::vector<std::string> &headers, const char *lin
 	if (FindField(data, "temperature_C"))
 	{
 		tempC = (float)atof(data["temperature_C"].c_str());
+		haveTemp = true;
+	}
+	else if (FindField(data, "temperature_F"))
+	{
+		tempC = (float)ConvertToCelsius(atof(data["temperature_F"].c_str()));
 		haveTemp = true;
 	}
 
@@ -303,6 +311,11 @@ bool CRtl433::ParseLine(const std::vector<std::string> &headers, const char *lin
 		wind_gust = (float)atof(data["gust"].c_str());
 		haveWind_Gust = true;
 	}
+	else if (FindField(data, "moisture"))
+	{
+		moisture = atoi(data["moisture"].c_str());
+		haveMoisture = true;
+	}
 
 	std::string model = data["model"];
 
@@ -335,48 +348,58 @@ bool CRtl433::ParseLine(const std::vector<std::string> &headers, const char *lin
 			return false; //invalid temp+hum
 	}
 
+	bool bHandled = false;
 	if (haveTemp && haveHumidity && havePressure)
 	{
 		int iForecast = 0;
 		SendTempHumBaroSensor(sensoridx, batterylevel, tempC, humidity, pressure, iForecast, model);
-		return true;
+		bHandled = true;
 	}
-	if (haveTemp && haveHumidity)
+	else if (haveTemp && haveHumidity)
 	{
 		SendTempHumSensor(sensoridx, batterylevel, tempC, humidity, model);
-		return true;
+		bHandled = true;
+	}
+	else 
+	{
+		if (haveTemp)
+		{
+			SendTempSensor(sensoridx, batterylevel, tempC, model);
+			bHandled = true;
+		}
+		if (haveHumidity)
+		{
+			SendHumiditySensor(sensoridx, batterylevel, humidity, model);
+			bHandled = true;
+		}
 	}
 	if (haveWind_Strength || haveWind_Gust || haveWind_Dir)
 	{
 		SendWind(sensoridx, batterylevel, wind_dir, wind_strength, wind_gust, tempC, 0, haveTemp, false, model);
-		return true;
-	}
-	if (haveTemp)
-	{
-		SendTempSensor(sensoridx, batterylevel, tempC, model);
-		return true;
-	}
-	if (haveHumidity)
-	{
-		SendHumiditySensor(sensoridx, batterylevel, humidity, model);
-		return true;
+		bHandled = true;
 	}
 	if (haveRain)
 	{
 		SendRainSensor(sensoridx, batterylevel, rain, model);
-		return true;
+		bHandled = true;
 	}
 	if (haveDepth_CM)
 	{
 		SendDistanceSensor(sensoridx, unit, batterylevel, depth_cm, model);
-		return true;
+		bHandled = true;
 	}
 	if (haveDepth)
 	{
 		SendDistanceSensor(sensoridx, unit, batterylevel, depth, model);
-		return true;
+		bHandled = true;
 	}
-	return false; //not handled (Yet!)
+	if (haveMoisture)
+	{
+		SendMoistureSensor(sensoridx, batterylevel, moisture, model);
+		bHandled = true;
+	}
+
+	return bHandled; //not handled (Yet!)
 }
 
 void CRtl433::Do_Work()

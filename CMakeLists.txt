@@ -1,11 +1,27 @@
-#set to minimum version that supports clean build on cygwin
-cmake_minimum_required(VERSION 2.8.4)
+#set to minimum version that supports clean build
+cmake_minimum_required(VERSION 3.14.0)
 
 project(domoticz)
 
 ## required min. libBoost version
-SET(DOMO_MIN_LIBBOOST_VERSION 106000)
+SET(DOMO_MIN_LIBBOOST_VERSION 1.66.0)
 ##
+
+MACRO(History_GET_REVISION variable)
+  IF(EXISTS ${CMAKE_SOURCE_DIR}/History.txt)
+    MESSAGE(STATUS "Read ProjectRevision from History.txt")
+    CMAKE_POLICY(SET CMP0007 NEW)
+    FILE(STRINGS ${CMAKE_SOURCE_DIR}/History.txt AppVersionContent)
+    LIST(GET AppVersionContent 0 AppVersionContent)
+    STRING(REPLACE " " ";" AppVersionContent ${AppVersionContent})
+    LIST(GET AppVersionContent 1 AppVersionContent)
+    STRING(REPLACE "." ";" AppVersionContent ${AppVersionContent})
+    LIST(GET AppVersionContent 1 ${variable})
+  ELSE(EXISTS ${CMAKE_SOURCE_DIR}/History.txt)
+    MESSAGE(STATUS "Failed to get ProjectRevision from History.txt, set it to 0")
+    set (${variable} 0)
+  ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/History.txt)
+ENDMACRO(History_GET_REVISION)
 
 MACRO(Gitversion_GET_REVISION dir variable)
   EXECUTE_PROCESS(COMMAND ${GIT_EXECUTABLE} --git-dir ./.git rev-list HEAD --count
@@ -17,16 +33,7 @@ ENDMACRO(Gitversion_GET_REVISION)
 Gitversion_GET_REVISION("${CMAKE_SOURCE_DIR}" ProjectRevision)
 IF(NOT ProjectRevision)
   MESSAGE(STATUS "Failed to get ProjectRevision from git")
-  IF(EXISTS ${CMAKE_SOURCE_DIR}/appversion.default)
-    MESSAGE(STATUS "Read ProjectRevision from appversion.default")
-    FILE(STRINGS ${CMAKE_SOURCE_DIR}/appversion.default AppVersionContent)
-    LIST(GET AppVersionContent 0 AppVersionContent)
-    STRING(REPLACE " " ";" AppVersionContent ${AppVersionContent})
-    LIST(GET AppVersionContent 2 ProjectRevision)
-  ELSE(EXISTS ${CMAKE_SOURCE_DIR}/appversion.default)
-    MESSAGE(STATUS "No appversion.default, set ProjectRevision to 0")
-    set (ProjectRevision 0)
-  ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/appversion.default)
+  History_GET_REVISION(ProjectRevision)
 ELSE(NOT ProjectRevision)
   MATH(EXPR ProjectRevision "${ProjectRevision}+2107")
 ENDIF(NOT ProjectRevision)
@@ -243,7 +250,7 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _input)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
   ENDIF()
   IF(CMAKE_COMPILER_IS_GNUCXX)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wno-psabi")
     #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-switch")
     #ADD_DEFINITIONS( -Wall -O0 -ggdb )
     #ADD_DEFINITIONS( -Wfatal-errors -Wformat=2 -Werror=format-security )
@@ -507,7 +514,7 @@ webserver/connection_manager.cpp
 webserver/cWebem.cpp
 webserver/fastcgi.cpp
 webserver/mime_types.cpp
-webserver/proxycommon.cpp
+webserver/proxycereal.cpp
 webserver/proxyclient.cpp
 webserver/reply.cpp
 webserver/request_handler.cpp
@@ -576,13 +583,15 @@ set(Boost_USE_STATIC_LIBS ${USE_STATIC_BOOST})
 set(Boost_USE_MULTITHREADED ON)
 unset(Boost_INCLUDE_DIR CACHE)
 unset(Boost_LIBRARY_DIRS CACHE)
-find_package(Boost REQUIRED COMPONENTS thread system)
 
 if(USE_STATIC_BOOST)
    message(STATUS "Linking against boost static libraries")
 else(USE_STATIC_BOOST)
    message(STATUS "Linking against boost dynamic libraries")
 endif(USE_STATIC_BOOST)
+
+find_package(Boost REQUIRED COMPONENTS thread system)
+target_link_libraries(domoticz Boost::thread Boost::system)
 
 # compare found vs required libBoost version
 if(Boost_VERSION VERSION_LESS DOMO_MIN_LIBBOOST_VERSION)
@@ -695,7 +704,7 @@ IF(OpenZWave)
   IF(USE_STATIC_OPENZWAVE)
     IF(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
       set(IOKIT_LIBRARY "-framework IOKit -framework CoreFoundation" CACHE FILEPATH "IOKit framework" FORCE)
-      target_link_libraries(domoticz ${IOKIT_LIBRARY})
+      target_link_libraries(domoticz ${IOKIT_LIBRARY} -lresolv)
     ELSEIF(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
       MESSAGE(STATUS "Building on FreeBSD, libudev not needed!")
       FIND_PATH(ICONV_INCLUDE_DIR iconv.h)
