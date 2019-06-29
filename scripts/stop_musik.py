@@ -1,0 +1,21 @@
+#!/usr/bin/python
+
+# Import soco and get a SoCo instance
+import soco
+
+#device = soco.discovery.any_soco()
+#Discover is not working right now
+#device = soco.discovery.by_name("Stue")
+
+device = soco.SoCo("192.168.2.30")
+
+# Dial up the volume (just a bit) and play
+device.volume = 10
+device.stop()
+
+device = soco.SoCo("192.168.2.105")
+
+# Dial up the volume (just a bit) and play
+device.volume = 10
+device.stop()
+
