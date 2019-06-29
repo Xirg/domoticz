@@ -1,9 +1,9 @@
 #!/bin/bash
-domoticzcheck=$(curl --max-time 60 -k -s "http://Xirg:domoticxk4QwT123@192.168.2.51:4040/json.htm?type=command&param=getversion" | grep '"status"' | awk '{ print $3 }' | sed 's/[\,"]//g')
+domoticzcheck=$(curl --max-time 60 -k -s "http://$domoticzusername:$domoticzpassword@$domoticzip:$domoticzport/json.htm?type=command&param=getversion" | grep '"status"' | awk '{ print $3 }' | sed 's/[\,"]//g')
 if [[ $domoticzcheck != "OK" ]]; then
         echo "Domoticz not running, checking again in 30 seconds."
         sleep 30
-        domoticzcheck=$(curl --max-time 60 -k -s "http://Xirg:domoticxk4QwT123@192.168.2.51:4040/json.htm?type=command&param=getversion" | grep '"status"' | awk '{ print $3 }' | sed 's/[\,"]//g')
+        domoticzcheck=$(curl --max-time 60 -k -s "http://$domoticzusername:$domoticzpassword@$domoticzip:$domoticzport/json.htm?type=command&param=getversion" | grep '"status"' | awk '{ print $3 }' | sed 's/[\,"]//g')
         if [[ $domoticzcheck != "OK" ]]; then
                 echo "Watchguard is restarting Domoticz"
                 sudo service domoticz stop
