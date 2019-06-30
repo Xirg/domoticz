@@ -1,4 +1,7 @@
 #!/bin/bash
+DIR=$(cd $(dirname "$0"); pwd)
+. "$DIR/params.domoticz"
+
 domoticzcheck=$(curl --max-time 60 -k -s "http://$domoticzusername:$domoticzpassword@$domoticzip:$domoticzport/json.htm?type=command&param=getversion" | grep '"status"' | awk '{ print $3 }' | sed 's/[\,"]//g')
 if [[ $domoticzcheck != "OK" ]]; then
         echo "Domoticz not running, checking again in 30 seconds."

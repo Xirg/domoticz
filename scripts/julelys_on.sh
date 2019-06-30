@@ -1,3 +1,5 @@
 ##!/bin/bash
+DIR=$(cd $(dirname "$0"); pwd)
+. "$DIR/params.hue"
 
-curl -X PUT --data '{"on":true}' http://192.168.2.40/api/uPzZ5R1hZZXoxwDkOsVLaFpAjAvntUU0igA92EN7/lights/19/state
+curl -X PUT --data '{"on":true}' http://$hueip/api/$hueapi/lights/19/state

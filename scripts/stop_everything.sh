@@ -1,5 +1,7 @@
 #!/bin/bash
-source ./domoticz.params
+DIR=$(cd $(dirname "$0"); pwd)
+. "$DIR/params.domoticz"
+
 #python "/home/pi/domoticz/scripts/stuen_stop_music.py"
 #python "/home/pi/domoticz/scripts/bad_stop_music.py"
 
