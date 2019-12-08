@@ -92,7 +92,6 @@ local getDiffParts = function(secDiff, ms, offsetMS)
 		cmp
 end
 
-
 -- week functions as taken from http://lua-users.org/wiki/WeekNumberInYear
 -- Get day of a week at year beginning
 --(tm can be any date and will be forced to 1st of january same year)
@@ -109,8 +108,8 @@ end
 
 -- tm: date (as retruned fro os.time)
 -- returns basic correction to be add for counting number of week
---  weekNum = math.floor((dayOfYear + returnedNumber) / 7) + 1
--- (does not consider correctin at begin and end of year)
+-- weekNum = math.floor((dayOfYear + returnedNumber) / 7) + 1
+-- (does not consider correction at begin and end of year)
 function getDayAdd(tm)
 	local yearBeginDayOfWeek = getYearBeginDayOfWeek(tm)
 	local dayAdd
@@ -145,12 +144,11 @@ function getWeekNumberOfYear(tm)
 		local nextYearBegin = os.time{year=os.date("*t",tm).year+1,month=1,day=1}
 		local yearBeginDayOfWeek = getYearBeginDayOfWeek(nextYearBegin)
 		if(yearBeginDayOfWeek < 5 ) then
-		  weekNum = 1
+			weekNum = 1
 		end
 	end
 	return weekNum
 end
-
 
 local function Time(sDate, isUTC, _testMS)
 
@@ -177,7 +175,7 @@ local function Time(sDate, isUTC, _testMS)
 		isUTC = false
 	end
 
-	if (sDate == nil or sDate == '') then
+	local function makesDate()
 		local now
 		if (isUTC) then
 			now = os.date('!*t')
@@ -185,10 +183,19 @@ local function Time(sDate, isUTC, _testMS)
 			now = os.date('*t')
 		end
 		local ms = _testMS == nil and getMS() or _testMS
-		sDate = now.year .. '-' .. now.month ..'-' .. now.day .. ' ' .. now.hour .. ':' .. now.min .. ':' .. now.sec .. '.' .. tostring(ms)
+		return ( now.year .. '-' .. now.month ..'-' .. now.day .. ' ' .. now.hour .. ':' .. now.min .. ':' .. now.sec .. '.' .. tostring(ms) )
 	end
 
-	local y,mon,d,h,min,s = parseDate(sDate)
+	if sDate == nil or sDate == '' then
+		sDate = makesDate()
+	end
+
+	local y, mon, d, h, min, s = parseDate(sDate)
+	if not(y and mon and d and h and min and s) then
+		sDate = makesDate()
+		y, mon, d, h, min, s = parseDate(sDate)
+		utils.log('sDate was invalid. Reset to ' .. sDate , utils.LOG_ERROR)
+	end
 
 	-- extract s and ms
 	s, ms = getSMs(s)
@@ -231,6 +238,7 @@ local function Time(sDate, isUTC, _testMS)
 
 	self.rawDate = self.year .. '-' .. string.format("%02d", self.month) .. '-' .. string.format("%02d", self.day)
 	self.rawTime = string.format("%02d", self.hour) .. ':' .. string.format("%02d", self.min) .. ':' .. string.format("%02d", self.sec)
+	self.rawDateTime = self.rawDate .. ' ' .. self.rawTime
 	self.milliSeconds = ms
 	self.milliseconds = ms
 	self.dayAbbrOfWeek = LOOKUP[self.wday]
@@ -244,10 +252,10 @@ local function Time(sDate, isUTC, _testMS)
 		now.month==time.month and
 		now.day==time.day)
 
-	self['msAgo'] = msDiff
-	self['millisecondsAgo'] = msDiff
+	self['msAgo'] = math.floor(msDiff)
+	self['millisecondsAgo'] = self.msAgo
 	self['minutesAgo'] = minDiff
-	self['secondsAgo'] = secDiff
+	self['secondsAgo'] = math.floor(secDiff)
 	self['hoursAgo'] = hourDiff
 	self['daysAgo'] = dayDiff
 
@@ -277,12 +285,12 @@ local function Time(sDate, isUTC, _testMS)
 			return {
 				mins = minDiff,
 				hours = hourDiff,
-				secs = secDiff,
-				seconds = secDiff,
+				secs = math.floor(secDiff),
+				seconds = math.floor(secDiff),
 				minutes = minDiff,
 				days = dayDiff,
-				ms = msDiff,
-				milliseconds = msDiff,
+				ms = math.floor(msDiff),
+				milliseconds = math.floor(msDiff),
 				compare = cmp -- 0 == equal, -1==(t earlier than self), 1=(t later than self)
 			}
 		else
@@ -424,7 +432,7 @@ local function Time(sDate, isUTC, _testMS)
 		elseif (string.find(rule, 'every even week') and ((self.week % 2) == 0)) then
 			return true
 		elseif string.find(rule, 'every even week') or string.find(rule, 'every odd week') then
-        	return false
+			return false
 		end
 
 		local weeks = string.match(rule, 'in week% ([0-9%-%,% ]*)')
@@ -470,25 +478,17 @@ local function Time(sDate, isUTC, _testMS)
 			return nil
 		end
 
+		local _ = require('lodash')
+		local dateTable = utils.stringSplit(dates,',') -- get all date(ranges)
+
 		-- remove spaces and add a comma
 		dates = string.gsub(dates, ' ', '') .. ',' --remove spaces and add a , so each number is terminated with a , so we can do simple search for the number
+
 		-- do a quick scan first to see if we already have a match without needing to search for ranges and wildcards
-
-		local dday = ''
-		local mmonth = ''
-
-		local _ = require('lodash')
-
-		if (self.day < 10) then dday = '0' .. tostring(self.day) end
-		if (self.month < 10) then mmonth = '0' .. tostring(self.month) end
-
-		if (
-			string.find(dates, tostring(self.day) .. '/' .. tostring(self.month) .. ',') or
-			(dday~='' and string.find(dates, dday .. '/' .. tostring(self.month) .. ',')) or
-			(mmonth ~= '' and string.find(dates, tostring(self.day) .. '/' .. mmonth .. ',')) or
-			(dday ~= '' and mmonth ~= '' and string.find(dates, dday .. '/' .. mmonth .. ','))
-		) then
-			return true
+		for index, value in ipairs(dateTable) do
+			if tonumber(value:match('%d+')) == self.day and tonumber(value:match('/(%d+)')) == self.month then
+				return true
+			end
 		end
 
 		-- wildcards
@@ -528,13 +528,6 @@ local function Time(sDate, isUTC, _testMS)
 
 				toDay, toMonth = getParts(toSet)
 				fromDay, fromMonth = getParts(fromSet)
-				--local _ = require('lodash');
-				--_.print('sm', self.month, 'sd', self.day, 'fm', fromMonth, 'tm', toMonth, 'fd', fromDay, 'td', toDay)
-				--_.print('( self.month > fromMonth and self.month < toMonth )', (self.month > fromMonth and self.month < toMonth))
-				--_.print('( fromMonth == toMonth and self.month == fromMonth and self.day >= fromDay and self.day <= toDay ) or', (fromMonth == toMonth and self.month == fromMonth and self.day >= fromDay and self.day <= toDay))
-				--_.print('( self.month == fromMonth and toMonth < fromMonth and self.day >= fromDay ) or', (self.month == fromMonth and toMonth < fromMonth and self.day >= fromDay) )
-				--_.print('( self.month == toMonth and toMonth < fromMonth and  self.day <= toDay )', (self.month == toMonth and toMonth < fromMonth and self.day <= toDay))
-				--_.print('( self.month == toMonth and toMonth > fromMonth and self.day <= toDay )', (self.month == toMonth and toMonth > fromMonth and self.day <= toDay))
 				if (
 					( self.month > fromMonth and self.month < toMonth ) or
 					( fromMonth == toMonth and self.month == fromMonth and self.day >= fromDay and self.day <= toDay ) or
@@ -720,9 +713,9 @@ local function Time(sDate, isUTC, _testMS)
 	end
 
 	-- returns true if self.time is after civil twilight start and before civil twilight end
-	function self.ruleIsAtCivilNight(rule)
+	function self.ruleIsAtCivilNightTime(rule)
 		if (string.find(rule, 'at civilnighttime')) then
-			return _G.timeofday['Civilnighttime'] -- coming from domotic
+			return _G.timeofday['Civilnighttime'] -- coming from domoticz
 		end
 		return nil -- no 'at civilnighttime' was specified in the rule
 	end
@@ -730,7 +723,7 @@ local function Time(sDate, isUTC, _testMS)
 	-- return true if self.time is after civil twilight end and before civil twilight start
 	function self.ruleIsAtCivilDayTime(rule)
 		if (string.find(rule, 'at civildaytime')) then
-			return _G.timeofday['Civildaytime'] -- coming from domotic
+			return _G.timeofday['Civildaytime'] -- coming from domoticz
 		end
 		return nil -- no 'at civildaytime' was specified
 	end
@@ -738,7 +731,7 @@ local function Time(sDate, isUTC, _testMS)
 	-- returns true if self.time is after sunset and before sunrise
 	function self.ruleIsAtNight(rule)
 		if (string.find(rule, 'at nighttime')) then
-			return _G.timeofday['Nighttime'] -- coming from domotic
+			return _G.timeofday['Nighttime'] -- coming from domoticz
 		end
 		return nil -- no 'at nighttime' was specified in the rule
 	end
@@ -746,7 +739,7 @@ local function Time(sDate, isUTC, _testMS)
 	-- return true if self.time is after sunrise and before sunset (daytime)
 	function self.ruleIsAtDayTime(rule)
 		if (string.find(rule, 'at daytime')) then
-			return _G.timeofday['Daytime'] -- coming from domotic
+			return _G.timeofday['Daytime'] -- coming from domoticz
 		end
 		return nil -- no 'at daytime' was specified
 	end
@@ -977,6 +970,7 @@ local function Time(sDate, isUTC, _testMS)
 		end
 		local res
 		local total = false
+		local rule = rule:lower()
 
 		-- at least one processor should return something else than nil
 		-- a processor returns true, false or nil. It is nil when the
@@ -1011,7 +1005,6 @@ local function Time(sDate, isUTC, _testMS)
 		end
 		updateTotal(res)
 
-
 		local _between = self.ruleMatchesBetweenRange(rule) -- range
 
 		if (_between == false) then
@@ -1029,57 +1022,47 @@ local function Time(sDate, isUTC, _testMS)
 
 			res = self.ruleIsBeforeSunset(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes before sunset and now is not at that time
 				return false
 			end
 			updateTotal(res)
-
-
 			res = self.ruleIsAfterSunset(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes after sunset and now is not at that time
 				return false
 			end
 			updateTotal(res)
 
 			res = self.ruleIsBeforeCivilTwilightStart(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes before civil twilight start and now is not at that time
 				return false
 			end
 			updateTotal(res)
 
 			res = self.ruleIsAfterCivilTwilightStart(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes after civil twilight start and now is not at that time
 				return false
 			end
 			updateTotal(res)
 
 			res = self.ruleIsBeforeCivilTwilightEnd(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes before civil twilight end now is not at that time
 				return false
 			end
 			updateTotal(res)
 
 			res = self.ruleIsAfterCivilTwilightEnd(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes after civil twilight end now is not at that time
 				return false
 			end
 			updateTotal(res)
 
 			res = self.ruleIsBeforeSunrise(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes before sunrise and now is not at that time
 				return false
 			end
 			updateTotal(res)
 
 			res = self.ruleIsAfterSunrise(rule) -- moment
 			if (res == false) then
-				-- rule has xx minutes after sunrise and now is not at that time
 				return false
 			end
 			updateTotal(res)
@@ -1087,42 +1070,54 @@ local function Time(sDate, isUTC, _testMS)
 
 		res = self.ruleIsAtCivilTwilightStart(rule) -- moment
 		if (res == false) then
-			-- rule has at civil twilight start and now is not at that time
 			return false
 		end
 		updateTotal(res)
 
 		res = self.ruleIsAtCivilTwilightEnd(rule) -- moment
 		if (res == false) then
-			-- rule has at civil twilight end and now is not at that time
 			return false
 		end
 		updateTotal(res)
 
 		res = self.ruleIsAtSunset(rule) -- moment
 		if (res == false) then
-			-- rule has at sunset and now is not at that time
 			return false
 		end
 		updateTotal(res)
 
 		res = self.ruleIsAtSunrise(rule) -- moment
 		if (res == false) then
-			-- rule has at sunrise and now is not at that time
 			return false
 		end
 		updateTotal(res)
 
 		res = self.ruleIsAtNight(rule) -- range
 		if (res == false) then
-			-- rule has at nighttime but it is not night time now
 			return false
 		end
 		updateTotal(res)
 
 		res = self.ruleIsAtDayTime(rule) -- range
 		if (res == false) then
-			-- rule has at daytime but it is at night now
+			return false
+		end
+		updateTotal(res)
+
+		res = self.ruleIsAtCivilNightTime(rule) -- range
+		if (res == false) then
+			return false
+		end
+		updateTotal(res)
+
+		res = self.ruleIsAtCivilDayTime(rule) -- range
+		if (res == false) then
+			return false
+		end
+		updateTotal(res)
+
+		res = self.ruleIsAtDayTime(rule) -- range
+		if (res == false) then
 			return false
 		end
 		updateTotal(res)
